@@ -135,7 +135,6 @@ class WuwPanel(wx.Panel):
                                    size=(12*self.Grid,2*self.Grid))
 
 #线程——捕获某帧图像 
-
 class ThreadCapture(threading.Thread):
     def __init__(self, threadname, times, cam):
         threading.Thread.__init__(self, name=threadname)

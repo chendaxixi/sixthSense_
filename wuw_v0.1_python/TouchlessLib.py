@@ -70,7 +70,8 @@ class Camera:
         if self.__img == None:
             img = None
         else:
-            img = self.__img.copy()
+          #  img = self.__img.copy()
+            img = self.__img.transpose(Image.FLIP_LEFT_RIGHT)
         self.__imgLock.release()
         return img
 
