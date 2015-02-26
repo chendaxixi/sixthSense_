@@ -11,10 +11,14 @@
 ##包括窗口建立和响应函数
 
 import wx
-from classes.Value import Value
 import threading
-import TouchlessLib
 import time
+import os
+import TouchlessLib
+from classes.Value import Value
+from classes.PointR import PointR
+from classes.GeometricRecognizer import GeometricRecognizer
+from classes.NBestList import NBestList
 
 class WuwPanel(wx.Panel):
     Width = Value.WuwWidth
@@ -23,6 +27,7 @@ class WuwPanel(wx.Panel):
         self.Grid = self.Width / 100
         wx.Panel.__init__(self, parent)
 
+        ###构建界面
         #构建TabPage构件组
         self.btnShowHide=wx.Button(self,pos=(self.Width-self.Grid*5,self.Grid),
                                  size=(3*self.Grid,3*self.Grid))
@@ -134,52 +139,196 @@ class WuwPanel(wx.Panel):
         self.lblResult=wx.StaticText(self, label="Test", pos=(12*self.Grid,self.Grid),
                                    size=(12*self.Grid,2*self.Grid))
 
-#线程——捕获某帧图像 
-class ThreadCapture(threading.Thread):
-    def __init__(self, threadname, times, cam):
-        threading.Thread.__init__(self, name=threadname)
-        self.__cam = cam
-        self.__times = times
-        self.__stop = False
-    def run(self):
-        while not self.__stop:
-            self.__cam.ImageCaptured()
-            time.sleep(self.__times)
-    def stop(self):
-        self.__stop = True
+        ###Global Variables
+        self.__touchlessMgr = None
+        self.__fAddingMarker = False
+        self.m = None
+        self.n = None
+        self.o = None
+        self.p = None
+        self.__isDown = False
+        self.__recording = False
+        self.__rec = GeometricRecognizer()
+        self.__points = []
+        
+        
+    	###Load
+        self.__touchlessMgr = TouchlessLib.TouchlessMgr()
+        self.__touchlessMgr.RefreshCameraList()
+        self.threadCapture = self.ThreadCapture("Capture", 0.03, self.pictureBoxDisplay, self.__touchlessMgr.CurrentCamera)
+        self.threadCapture.start()
+        self.gestureLoad()
+        time.clock()
 
-#线程——捕获图像显示
-class ThreadShow(threading.Thread):
-    def __init__(self, threadname, times, panel, cam):
-        threading.Thread.__init__(self, name=threadname)
-        self.__times = times
-        self.__panel = panel
-        self.__cam = cam
-        self.__stop = False
-    def run(self):
-        while not self.__stop:
-            img = self.__cam.GetCurrentImage()
+        ###事件响应
+        self.Bind(wx.EVT_WINDOW_DESTROY, self.WUW_Destroy)
+        self.pictureBoxDisplay.Bind(wx.EVT_PAINT, self.drawLatestImage)
+        self.buttonMarkerAdd.Bind(wx.EVT_BUTTON, self.buttonMarkerAdd_Click)
+        self.comboBoxMarkers.Bind(wx.EVT_COMBOBOX_DROPDOWN, self.comboBoxMarkers_DropDown)
+        self.comboBoxMarkers.Bind(wx.EVT_COMBOBOX,self.comboBoxMarkers_SelectedIndexChanged)
+        self.checkBoxMarkerHighlight.Bind(wx.EVT_CHECKBOX,self.checkBoxMarkerHighlight_CheckedChanged)
+        self.checkBoxMarkerSmoothing.Bind(wx.EVT_CHECKBOX,self.checkBoxMarkerSmoothing_CheckedChanged)
+        self.MarkerThresh.Bind(wx.EVT_TEXT,self.MarkerThresh_ValueChanged)
+        self.buttonMarkerRemove.Bind(wx.EVT_BUTTON, self.buttonMarkerRemove_Click)
+        self.buttonMarkerSave.Bind(wx.EVT_BUTTON, self.buttonMarkerSave_Click)
+        self.buttonMarkerLoad.Bind(wx.EVT_BUTTON, self.buttonMarkerLoad_Click)
+        self.Bind(wx.EVT_LEFT_DOWN, self.WUW_MouseDown)
+        self.Bind(wx.EVT_MOTION, self.WUW_MouseMove)
+        self.Bind(wx.EVT_LEFT_UP, self.WUW_MouseUp)
+
+    #线程——捕获某帧图像 
+    class ThreadCapture(threading.Thread):
+        def __init__(self, threadname, times, box, cam):
+            threading.Thread.__init__(self, name=threadname)
+            self.__times = times
+            self.__stop = False
+            self.__box = box
+            self.__cam = cam
+        def run(self):
+            while not self.__stop:
+                self.__cam.ImageCaptured()
+                self.__box.Refresh()
+                time.sleep(self.__times)
+        def stop(self):
+            self.__stop = True
+
+    ###WUW Management
+    def WUW_Destroy(self, event):
+        self.threadCapture.stop()
+
+    def WUW_Paint(self, event):
+        pass
+
+
+    ###Touchless Event Handling
+    def drawLatestImage(self, event):
+        if self.__touchlessMgr.CurrentCamera.isOn():
+            img = self.__touchlessMgr.CurrentCamera.GetCurrentImage()
             bmp = TouchlessLib.ImageToBitmap(img)
-            dc = wx.ClientDC(self.__panel.pictureBoxDisplay)
+            dc = wx.ClientDC(self.pictureBoxDisplay)
             dc.DrawBitmap(bmp,0,0)
-            time.sleep(self.__times)
-    def stop(self):
-        self.__stop = True
+
+
+    ###Marker Mode
+
+    ##Marker Buttons
+    def buttonMarkerAdd_Click(self, event):
+        self.__fAddingMarker = not self.__fAddingMarker
+        if self.__fAddingMarker:
+            self.buttonMarkerAdd.SetLabel("Cancel Adding Marker")
+        else:
+            self.buttonMarkerAdd.SetLabel("Add A New Marker")
+
+    def comboBoxMarkers_DropDown(self, event):
+        pass
+
+    def comboBoxMarkers_SelectedIndexChanged(self, event):
+        pass
+
+    ##UI Marker Editing
+    def checkBoxMarkerHighlight_CheckedChanged(self, event):
+        pass
+
+    def checkBoxMarkerSmoothing_CheckedChanged(self, event):
+        pass
+
+    def MarkerThresh_ValueChanged(self, event):
+        pass
+    
+    def buttonMarkerRemove_Click(self, event):
+        pass
+
+    def buttonMarkerSave_Click(self, event):
+        pass
+
+    def buttonMarkerLoad_Click(self, event):
+        pass
+
+    ##Display Interaction
+    def pictureBoxDisplay_MouseDown(self, event):
+        pass
+
+    def pictureBoxDisplay_MouseMove(self, event):
+        pass
+
+    def pictureBoxDisplay_MouseUp(self, event):
+        pass
+    
+    
+    ###Marker Functions
+
+    ##Marker Initial Functions
+    def nameMarkers(self):
+        self.m = self.__touchlessMgr.Markers[0]
+        self.n = self.__touchlessMgr.Markers[1]
+        self.o = self.__touchlessMgr.Markers[2]
+        self.p = self.__touchlessMgr.Markers[3]
+
+    ##Marker_OnChange
+    def m_OnChange(self, event):
+        pass
+
+    def n_OnChange(self, event):
+        pass
+
+    def o_OnChange(self, event):
+        pass
+
+    def p_OnChange(self, event):
+        passs
+
+    ##UpdateLabelLocation
+
+    ##Marker Helper Functions
+
+    ##Marker HandSigns Functions
+
+
+    ###Gesture Buttons
+
+
+    ###Gesture Functions
+    def gestureLoad(self):
+        folderName = "Gestures"
+        filePath = os.listdir(folderName)
+        for fileName in filePath:
+            counts = len(fileName)
+            if counts > 4:
+                if fileName[counts-1]=='l' and fileName[counts-2]=='m' and fileName[counts-3]=='x' and fileName[counts-4]=='.':
+                    self.__rec.LoadGesture(folderName + "\\" + fileName)
+            
+
+    ###Gesture Mouse Events
+    def WUW_MouseDown(self, event):
+        self.__isDown = True
+        self.__points = []
+        self.__points.append(PointR(event.GetX(), event.GetY(),time.clock()*1000))
+        self.Refresh()
+
+    def WUW_MouseMove(self, event):
+        if self.__isDown:
+            self.__points.append(PointR(event.GetX(),event.GetY(),time.clock()*1000))
+            self.Refresh(True, wx.Rect(event.GetX()-2,event.GetY()-2,4,4))
+
+    def WUW_MouseUp(self, event):
+        if self.__isDown:
+            self.__isDown = False
+            if len(self.__points) >= 5: # require 5 points for a valid gesture
+                if self.__recording:
+                    pass
+                elif self.__rec.NumGestures > 0:
+                    result = self.__rec.Recognize(self.__points)
+                    print result.Name
+                
+
+    ###Demo Mode
 
 def main():
     app = wx.App(False)
     frame = wx.Frame(None, wx.ID_ANY, "WUW", size=(WuwPanel.Width,WuwPanel.Height))
     panel = WuwPanel(frame)
     frame.Show(True)
-    cam = TouchlessLib.Camera()
-    cam.Start()
-    threadCapture = ThreadCapture("Capture", 0.03, cam)
-    threadShow = ThreadShow("Show", 0.03, panel, cam)
-    threadCapture.start()
-    threadShow.start()
     app.MainLoop()
-    threadCapture.stop()
-    threadShow.stop()
 
 if __name__ == "__main__":
     main()

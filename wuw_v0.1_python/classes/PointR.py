@@ -1,5 +1,5 @@
 #coding=utf-8
-#实点类，T表示绘制该店的时刻
+#实点类，T表示绘制该点的时刻
 
 class PointR:
     def __init__(self, x = 0, y = 0, t = 0):

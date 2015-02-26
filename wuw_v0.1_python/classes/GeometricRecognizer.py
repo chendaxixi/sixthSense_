@@ -142,7 +142,8 @@ class GeometricRecognizer:
         except Exception:
             success = false
         return success
-    
+    
+
     def ReadGesture(self, root):
         if root.tag != "Gesture":
             return None
@@ -164,7 +165,7 @@ class GeometricRecognizer:
             tree = ET.parse(filename)
             root = tree.getroot()
             p = self.ReadGesture(root)
-
+            
             counts = self.NumGestures
             for i in range(counts):
                 if self.__gestures[i].Name == p.Name:
@@ -174,5 +175,4 @@ class GeometricRecognizer:
         except Exception:
             success = False
         return success
-
     
