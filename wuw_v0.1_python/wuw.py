@@ -14,6 +14,7 @@ import wx
 import threading
 import time
 import os
+import math
 import TouchlessLib
 from classes.Value import Value
 from classes.PointR import PointR
@@ -150,7 +151,12 @@ class WuwPanel(wx.Panel):
         self.__recording = False
         self.__rec = GeometricRecognizer()
         self.__points = []
-        
+        self.__show_settings = False
+        self.__markerCenter = None
+        self.__markerRadius = 0
+        self.__drawSelectionAdornment = False
+        self.__addedMarkerCount = 0
+        self.__latestFrame = None
         
     	###Load
         self.__touchlessMgr = TouchlessLib.TouchlessMgr()
@@ -159,9 +165,11 @@ class WuwPanel(wx.Panel):
         self.threadCapture.start()
         self.gestureLoad()
         time.clock()
+        self.ResetEnvironment()
 
         ###事件响应
         self.Bind(wx.EVT_WINDOW_DESTROY, self.WUW_Destroy)
+        self.Bind(wx.EVT_PAINT, self.WUW_Paint)
         self.pictureBoxDisplay.Bind(wx.EVT_PAINT, self.drawLatestImage)
         self.buttonMarkerAdd.Bind(wx.EVT_BUTTON, self.buttonMarkerAdd_Click)
         self.comboBoxMarkers.Bind(wx.EVT_COMBOBOX_DROPDOWN, self.comboBoxMarkers_DropDown)
@@ -175,6 +183,8 @@ class WuwPanel(wx.Panel):
         self.Bind(wx.EVT_LEFT_DOWN, self.WUW_MouseDown)
         self.Bind(wx.EVT_MOTION, self.WUW_MouseMove)
         self.Bind(wx.EVT_LEFT_UP, self.WUW_MouseUp)
+        self.btnExit.Bind(wx.EVT_BUTTON, self.btnExit_Click)
+        self.btnShowHide.Bind(wx.EVT_BUTTON, self.btnShowHide_Click)
 
     #线程——捕获某帧图像 
     class ThreadCapture(threading.Thread):
@@ -192,22 +202,68 @@ class WuwPanel(wx.Panel):
         def stop(self):
             self.__stop = True
 
+
+    ###Environmenmt
+    def btnExit_Click(self, event):
+        if self.__touchlessMgr.MarkersCount >= 4:
+            self.m = None
+            self.n = None
+            self.o = None
+            self.p = None
+        self.GetParent().Close()
+
+    def btnShowHide_Click(self, event):
+        if self.__show_settings:
+            self.tabSettings.Hide()
+            self.pictureBoxDisplay.Hide()
+            self.btnExit.Hide()
+            self.__show_settings = False
+            self._fAddingMarker = False
+        else:
+            self.tabSettings.Show()
+            self.pictureBoxDisplay.Show()
+            self.btnExit.Show()
+            self.__show_settings = True
+
+    def ResetEnvironment(self):
+        self.__show_settings = False
+        self.tabSettings.Hide()
+        self.pictureBoxDisplay.Hide()
+        self.btnExit.Hide()
+
+    def StopOtherApps(self, event):
+        pass
+
     ###WUW Management
     def WUW_Destroy(self, event):
         self.threadCapture.stop()
 
     def WUW_Paint(self, event):
-        pass
+        if len(self.__points) > 0:
+            dc = wx.PaintDC(self)
+            if self.__recording:
+                brush = wx.Brush("red")
+            else:
+                brush = wx.Brush("blue")
+            dc.SetBrush(brush)
+            for p in self.__points:
+                dc.DrawEllipse(p.X-2,p.Y-2,4,4)
+            p = self.__points[0]
+            dc.DrawEllipse(p.X-5,p.Y-5,10,10)
 
 
     ###Touchless Event Handling
     def drawLatestImage(self, event):
         if self.__touchlessMgr.CurrentCamera.isOn():
-            img = self.__touchlessMgr.CurrentCamera.GetCurrentImage()
-            bmp = TouchlessLib.ImageToBitmap(img)
-            dc = wx.ClientDC(self.pictureBoxDisplay)
+            self.__latestFrame = self.__touchlessMgr.CurrentCamera.GetCurrentImage()
+            bmp = TouchlessLib.ImageToBitmap(self.__latestFrame)
+            dc = wx.PaintDC(self.pictureBoxDisplay)
             dc.DrawBitmap(bmp,0,0)
 
+            if self.__drawSelectionAdornment:
+                dc.SetPen(wx.Pen("red", 1))
+                dc.SetBrush(wx.Brush("",wx.TRANSPARENT))
+                dc.DrawEllipse(self.__markerCenter.x-self.__markerRadius,self.__markerCenter.y-self.__markerRadius,2*self.__markerRadius,2*self.__markerRadius)
 
     ###Marker Mode
 
@@ -246,23 +302,52 @@ class WuwPanel(wx.Panel):
 
     ##Display Interaction
     def pictureBoxDisplay_MouseDown(self, event):
-        pass
+        if not self.__touchlessMgr.CurrentCamera.isOn():
+            return
+        self.__markerCenter = event.GetPosition() - self.pictureBoxDisplay.GetPosition()
+        self.__markerRadius = 0
+        self.__drawSelectionAdornment = True
 
     def pictureBoxDisplay_MouseMove(self, event):
-        pass
+        if not self.__markerCenter == None:
+            dx = event.GetX() - self.pictureBoxDisplay.GetPosition().x - self.__markerCenter.x
+            dy = event.GetY() - self.pictureBoxDisplay.GetPosition().y - self.__markerCenter.y
+            self.__markerRadius = math.sqrt(dx*dx + dy*dy)
+
+            self.pictureBoxDisplay.Refresh()
 
     def pictureBoxDisplay_MouseUp(self, event):
-        pass
+        if not self.__markerCenter == None:
+            dx = event.GetX() - self.__markerCenter.x
+            dy = event.GetY() - self.__markerCenter.y
+            self.__markerRadius = math.sqrt(dx*dx + dy*dy)
+
+            img = self.__latestFrame
+            size = self.pictureBoxDisplay.GetSize()
+            self.__markerCenter.x = (self.__markerCenter.x * img.size[0]) / size.width
+            self.__markerCenter.y = (self.__markerCenter.y * img.size[1]) / size.height
+            self.__markerRadius = (self.__markerRadius * img.size[1]) / size.height
+            newMarker = self.__touchlessMgr.AddMarker(str.format("Marker #{0}", self.__addedMarkerCount), img, self.__markerCenter, self.__markerRadius)
+
+        self.__markerCenter = None
+        self.__markerRadius = 0
+        self.__drawSelectionAdornment = False
+        self.pictureBoxDisplay.Refresh()
+
+        if self.__touchlessMgr.MarkersCount == 4:
+            self.__fAddingMarker = False
+        self.nameMarkers()
     
     
     ###Marker Functions
 
     ##Marker Initial Functions
     def nameMarkers(self):
-        self.m = self.__touchlessMgr.Markers[0]
-        self.n = self.__touchlessMgr.Markers[1]
-        self.o = self.__touchlessMgr.Markers[2]
-        self.p = self.__touchlessMgr.Markers[3]
+        if self.__touchlessMgr.MarkersCount == 4:
+            self.m = self.__touchlessMgr.Markers[0]
+            self.n = self.__touchlessMgr.Markers[1]
+            self.o = self.__touchlessMgr.Markers[2]
+            self.p = self.__touchlessMgr.Markers[3]
 
     ##Marker_OnChange
     def m_OnChange(self, event):
@@ -275,14 +360,13 @@ class WuwPanel(wx.Panel):
         pass
 
     def p_OnChange(self, event):
-        passs
+        pass
 
     ##UpdateLabelLocation
 
     ##Marker Helper Functions
 
     ##Marker HandSigns Functions
-
 
     ###Gesture Buttons
 
@@ -300,17 +384,31 @@ class WuwPanel(wx.Panel):
 
     ###Gesture Mouse Events
     def WUW_MouseDown(self, event):
+        if self.__show_settings:
+            point = event.GetPosition()
+            rect = self.pictureBoxDisplay.GetRect()
+            if point.x >= rect.x and point.x <= rect.x + rect.width and point.y >= rect.y and point.y <= rect.y + rect.height:
+                self.__fAddingMarker = True
+        if self.__fAddingMarker:
+            self.pictureBoxDisplay_MouseDown(event)
+            return
         self.__isDown = True
         self.__points = []
         self.__points.append(PointR(event.GetX(), event.GetY(),time.clock()*1000))
         self.Refresh()
 
     def WUW_MouseMove(self, event):
+        if self.__fAddingMarker:
+            self.pictureBoxDisplay_MouseMove(event)
+            return
         if self.__isDown:
             self.__points.append(PointR(event.GetX(),event.GetY(),time.clock()*1000))
             self.Refresh(True, wx.Rect(event.GetX()-2,event.GetY()-2,4,4))
 
     def WUW_MouseUp(self, event):
+        if self.__fAddingMarker:
+            self.pictureBoxDisplay_MouseUp(event)
+            return
         if self.__isDown:
             self.__isDown = False
             if len(self.__points) >= 5: # require 5 points for a valid gesture

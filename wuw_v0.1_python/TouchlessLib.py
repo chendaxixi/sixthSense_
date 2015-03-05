@@ -9,6 +9,7 @@ import Image
 import wx
 import numpy as np
 import math
+import time
 
 #摄像头类定义
 class Camera:
@@ -123,20 +124,41 @@ class HSV:
 
     @staticmethod
     def ConvertFromColor(c):
-        pass
+        return RGB.ConvertToHSV(RGB(c.Red(),c.Green(),c.Blue()))
 
     @staticmethod
     def ConvertToColor(hsv):
-        pass
+        rgb = HSV.ConvertToRGB(hsv)
+        return wx.Colour(rgb.Red,rgb.Grn,rgb.Blu)
 
     @staticmethod
     def ConvertToRGB(hsv):
-        pass
+        num = (int)(hsv.Hue / 60) % 6
+        num2 = (float)(hsv.Hue/60.0) - (int)(hsv.Hue/60)
+        b = (int)(hsv.Val * (hsv.HSV_MAX_SAT - hsv.Sat) / hsv.HSV_MAX_SAT)
+        r = (int)(hsv.Val * (hsv.HSV_MAX_SAT - (float)(num2*hsv.Sat)) / (float)(hsv.HSV_MAX_SAT))
+        g = (int)(hsv.Val * (hsv.HSV_MAX_SAT - (float)(1.00-num2)*hsv.Sat) / (float)(hsv.HSV_MAX_SAT))
+        if num == 0:
+            return RGB(hsv.Val, g, b)
+        elif num == 1:
+            return RGB(r, hsv.Val, b)
+        elif num == 2:
+            return RGB(b, hsv.Val, g)
+        elif num == 3:
+            return RGB(b, r, hsv.Val)
+        elif num == 4:
+            return RGB(g, b, hsv.Val)
+        elif num == 5:
+            return RGB(hsv.Val, b, r)
+        else:
+            return RGB()
 
     @staticmethod
     def GetBinnedHSV(hsv, binCounts):
-        pass
-            
+        h = (int)((hsv.Hue*(binCounts.Hue-1)) / hsv.HSV_MAX_HUE)
+        s = (int)((hsv.Sat*(binCounts.Sat-1)) / hsv.HSV_MAX_SAT)
+        v = (int)((hsv.Val*(binCounts.Val-1)) / hsv.HSV_MAX_VAL)
+        return HSV(h,s,v)
 
 
 #RGB类定义
@@ -172,16 +194,34 @@ class RGB:
 
     @staticmethod
     def ConvertFromColor(c):
-        pass
+        return RGB(c.Red(),c.Green(),c.Blue())
 
     @staticmethod
     def ConvertToColor(rgb):
-        pass
+        return wx.Colour(rgb.Red,rgb.Grn,rgb.Blu)
 
     @staticmethod
     def ConvertToHSV(rgb):
-        pass
-
+        max_ = max(rgb.Red, rgb.Grn, rgb.Blu)
+        min_ = min(rgb.Red, rgb.Grn, rgb.Blu)
+        hsv = HSV()
+        hsv.Val = max_
+        if max_ == 0:
+            hsv.Sat = 0
+        else:
+            hsv.Sat = (int)(255 * (max_ - min_) / max_)
+        if max_ == min_:
+            hsv.Hue = 0
+            return hsv
+        if rgb.Red == max_:
+            hsv.Hue = (int)((60*(rgb.Grn-rgb.Blu)/(max_-min_) + 360) % 360)
+            return hsv
+        if rgb.Grn == max_:
+            hsv.Hue = (int)(60*(rgb.Blu-rgb.Red)/(max_-min_) + 120)
+            return hsv
+        if rgb.Blu == max_:
+            hsv.Hue = (int)(60*(rgb.Red-rgb.Grn)/(max_-min_) + 240)
+            return hsv
 
 #ScanCommand定义：True为addMarker,False为remMarker
 
@@ -282,10 +322,10 @@ class Marker:
         self.__highlight = True
         self.__smoothingEnabled = True
         self.smoothingFactor = 0.55
-        self.searchMinX = TouchlessLib.MarkerScanCommand(self, True, 0)
-        self.searchMaxX = TouchlessLib.MarkerScanCommand(self, False, 0)
-        self.searchMinY = TouchlessLib.MarkerScanCommand(self, True, 0)
-        self.searchMaxY = TouchlessLib.MarkerScanCommand(self, False, 0)
+        self.searchMinX = MarkerScanCommand(self, True, 0)
+        self.searchMaxX = MarkerScanCommand(self, False, 0)
+        self.searchMinY = MarkerScanCommand(self, True, 0)
+        self.searchMaxY = MarkerScanCommand(self, False, 0)
         self.binsHue = 0
         self.binsSat = 0
         self.binsVal = 0
@@ -363,7 +403,30 @@ class Marker:
         return self.__name
 
     def SetMarkerAppearance(self, rawHsvFreq):
-        pass
+        shape = rawHsvFreq.shape
+        self.binsHue = (int)(shape[0])
+        self.binsSat = (int)(shape[1])
+        self.binsVal = (int)(shape[2])
+        self.__representativeColor = wx.Colour(0,0,0)
+        num = 0
+        num2 = 0
+        num3 = 0
+        num4 = 0
+        num5 = 0
+        for i in range(self.binsHue):
+            for j in range(self.binsSat):
+                for k in range(self.binsVal):
+                    if rawHsvFreq[i,j,k] > 0:
+                        num += rawHsvFreq[i,j,k]
+                        num3 += rawHsvFreq[i,j,k] * i
+                        num4 += rawHsvFreq[i,j,k] * j
+                        num5 += rawHsvFreq[i,j,k] * k
+                        num2 += 1
+        if num2 == 0:
+            return False
+        self.Threshold = (int)((2 * num) / num2)
+        self.__representativeColor = HSV.ConvertToColor(HSV((int)(num3/num),(int)(num4/num),(int)(num5/num)))
+        return True
 
 
 #TouchlessMgr类定义
@@ -399,7 +462,7 @@ class TouchlessMgr:
         return self.__markers
 
     def AddMarker(self, name, img, center, radius):
-        item = TouchlessLib.Marker(name)
+        item = Marker(name)
         item.SetMarkerAppearance(self.GetMarkerAppearance(img, center, radius))
         self.__markers.append(item)
         return item
@@ -422,19 +485,25 @@ class TouchlessMgr:
         for i in range(height):
             for j in range(width):
                 data = img.getpixel((j,i))
-                binnedHSV = HSV.GetBinnedHSV(RGB(data[0],data[1],data[2]),binCounts)
-                num = j - center.X
-                num2 = i - center.Y
+                binnedHSV = HSV.GetBinnedHSV(RGB.ConvertToHSV(RGB(data[0],data[1],data[2])),binCounts)
+                num = j - center.x
+                num2 = i - center.y
                 flag = math.sqrt(num*num+num2*num2) < radius
-                num6 = numArray[binnedHSV.Hue,binnedHSV.Sat,binnedHSV.Val]
                 if flag:
-                    num6 += 2
+                    numArray[binnedHSV.Hue,binnedHSV.Sat,binnedHSV.Val] += 2
                 else:
-                    num6 -= 1
+                    numArray[binnedHSV.Hue,binnedHSV.Sat,binnedHSV.Val] -= 1
         return numArray
 
     def postProcessMarker(self, marker):
-        pass
+    #    marker.currData.Timestamp =
+        if marker.currData.Area > 0:
+            marker.currData.Present = True
+            #marker.currData.ColorAvg =
+            marker.currData.X /= marker.currData.Area
+            marker.currData.Y /= marker.currData.Area
+            marker.currData.Bounds = wx.Rect(marker.currData.left,marker.currData.top,marker.currData.right-marker.currData.left,marker.currData.bottom-marker.currData.top)
+            if marker.prevData.
 
     def preProcessMarker(self, marker, imgWidth, imgHeight):
         pass
