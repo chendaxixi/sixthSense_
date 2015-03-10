@@ -3,42 +3,14 @@ from math import sqrt
 
 class RectangleR:
     def __init__(self, x = 0, y = 0, width = 0, height = 0, digits = 4):
-        self.__x = x
-        self.__y = y
-        self.__width = width
-        self.__height = height
-        self.__Digits = digits
+        self.X = x
+        self.Y = y
+        self.Width = width
+        self.Height = height
+        self.Digits = digits
 
     def __getitem__(self, range):
-        return RectangleR(self.__x,self.__y,self.__width,self.__height,self.__Digits)
-
-    @property
-    def X(self):
-        return round(self.__x, self.__Digits)
-    @X.setter
-    def X(self, value):
-        self.__x = value
-
-    @property
-    def Y(self):
-        return round(self.__y, self.__Digits)
-    @Y.setter
-    def Y(self, value):
-        self.__y = value
-
-    @property
-    def Width(self):
-        return round(self.__width, self.__Digits)
-    @Width.setter
-    def Width(self, value):
-        self.__width = value
-
-    @property
-    def Height(self):
-        return round(self.__height, self.__Digits)
-    @Height.setter
-    def Height(self, value):
-        self.__height = value
+        return RectangleR(self.X,self.Y,self.Width,self.Height,self.Digits)
 
     @property
     def TopLeft(self):
@@ -54,11 +26,11 @@ class RectangleR:
 
     @property
     def MaxSide(self):
-        return max(self.__width, self.__height)
+        return max(self.Width, self.Height)
 
     @property
     def MinSide(self):
-        return min(self.__width, self.__height)
+        return min(self.Width, self.Height)
 
     @property
     def Diagonal(self):

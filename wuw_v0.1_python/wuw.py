@@ -12,6 +12,7 @@
 
 import wx
 import threading
+import thread
 import time
 import os
 import math
@@ -157,12 +158,18 @@ class WuwPanel(wx.Panel):
         self.__drawSelectionAdornment = False
         self.__addedMarkerCount = 0
         self.__latestFrame = None
+        self.__ratioScreenCameraHeight = 0
+        self.__ratioScreenCameraWidth = 0
         
     	###Load
         self.__touchlessMgr = TouchlessLib.TouchlessMgr()
         self.__touchlessMgr.RefreshCameraList()
         self.threadCapture = self.ThreadCapture("Capture", 0.03, self.pictureBoxDisplay, self.__touchlessMgr.CurrentCamera)
+        self.threadCapture.setDaemon(True)
         self.threadCapture.start()
+        self.threadMarker = self.ThreadMarker("Marker", 1, self.__touchlessMgr)
+        self.threadMarker.setDaemon(True)
+        self.threadMarker.start()
         self.gestureLoad()
         time.clock()
         self.ResetEnvironment()
@@ -202,7 +209,20 @@ class WuwPanel(wx.Panel):
         def stop(self):
             self.__stop = True
 
-
+    #线程——追踪标记物
+    class ThreadMarker(threading.Thread):
+        def __init__(self, threadname, times, mgr):
+            threading.Thread.__init__(self, name=threadname)
+            self.__times = times
+            self.__mgr = mgr
+            self.__stop = False
+        def run(self):
+            while not self.__stop:
+                self.__mgr.UpdateMarkers(self.__mgr.CurrentCamera.GetCurrentImage())
+                time.sleep(self.__times)
+        def stop(self):
+            self.__stop = True
+            
     ###Environmenmt
     def btnExit_Click(self, event):
         if self.__touchlessMgr.MarkersCount >= 4:
@@ -237,6 +257,7 @@ class WuwPanel(wx.Panel):
     ###WUW Management
     def WUW_Destroy(self, event):
         self.threadCapture.stop()
+        self.threadMarker.stop()
 
     def WUW_Paint(self, event):
         if len(self.__points) > 0:
@@ -318,8 +339,8 @@ class WuwPanel(wx.Panel):
 
     def pictureBoxDisplay_MouseUp(self, event):
         if not self.__markerCenter == None:
-            dx = event.GetX() - self.__markerCenter.x
-            dy = event.GetY() - self.__markerCenter.y
+            dx = event.GetX() - self.pictureBoxDisplay.GetPosition().x - self.__markerCenter.x
+            dy = event.GetY() - self.pictureBoxDisplay.GetPosition().y - self.__markerCenter.y
             self.__markerRadius = math.sqrt(dx*dx + dy*dy)
 
             img = self.__latestFrame
@@ -328,6 +349,7 @@ class WuwPanel(wx.Panel):
             self.__markerCenter.y = (self.__markerCenter.y * img.size[1]) / size.height
             self.__markerRadius = (self.__markerRadius * img.size[1]) / size.height
             newMarker = self.__touchlessMgr.AddMarker(str.format("Marker #{0}", self.__addedMarkerCount), img, self.__markerCenter, self.__markerRadius)
+            self.__addedMarkerCount += 1
 
         self.__markerCenter = None
         self.__markerRadius = 0
@@ -349,20 +371,30 @@ class WuwPanel(wx.Panel):
             self.o = self.__touchlessMgr.Markers[2]
             self.p = self.__touchlessMgr.Markers[3]
 
+            self.m.OnChange = self.m_OnChange
+            self.n.OnChange = self.n_OnChange
+            self.o.OnChange = self.o_OnChange
+            self.p.OnChange = self.p_OnChange
+            
+            self.__ratioScreenCameraHeight = (1.0 * self.Height / self.__touchlessMgr.CurrentCamera.CaptureHeight)
+            self.__ratioScreenCameraWidth = (1.0 * self.Width / self.__touchlessMgr.CurrentCamera.CaptureWidth)
+
     ##Marker_OnChange
     def m_OnChange(self, event):
-        pass
+        print event.X, (int)(event.X * self.__ratioScreenCameraWidth), event.Y, (int)(event.Y * self.__ratioScreenCameraHeight)
+        self.labelM.SetPosition(wx.Point((int)(event.X * self.__ratioScreenCameraWidth), (int)(event.Y * self.__ratioScreenCameraHeight)))
 
     def n_OnChange(self, event):
-        pass
+        print event.X, (int)(event.X * self.__ratioScreenCameraWidth), event.Y, (int)(event.Y * self.__ratioScreenCameraHeight)
+        self.labelN.SetPosition(wx.Point((int)(event.X * self.__ratioScreenCameraWidth), (int)(event.Y * self.__ratioScreenCameraHeight)))
 
     def o_OnChange(self, event):
-        pass
+        print event.X, (int)(event.X * self.__ratioScreenCameraWidth), event.Y, (int)(event.Y * self.__ratioScreenCameraHeight)
+        self.labelO.SetPosition(wx.Point((int)(event.X * self.__ratioScreenCameraWidth), (int)(event.Y * self.__ratioScreenCameraHeight)))
 
     def p_OnChange(self, event):
-        pass
-
-    ##UpdateLabelLocation
+        print event.X, (int)(event.X * self.__ratioScreenCameraWidth), event.Y, (int)(event.Y * self.__ratioScreenCameraHeight)
+        self.labelP.SetPosition(wx.Point((int)(event.X * self.__ratioScreenCameraWidth), (int)(event.Y * self.__ratioScreenCameraHeight)))
 
     ##Marker Helper Functions
 

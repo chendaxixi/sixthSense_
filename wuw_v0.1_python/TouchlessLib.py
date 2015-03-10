@@ -16,33 +16,12 @@ class Camera:
     
     def __init__(self, name="camera"):
         self.__name = name
-        self.__height = 480
-        self.__width = 640
+        self.CaptureHeight = 480
+        self.CaptureWidth = 640
         self.__img = None
         self.__imgLock = threading.RLock()
-        self.__fpslimit = 30
+        self.Fps = 30
         self.__cam = None
-
-    @property
-    def CaptureHeight(self):
-        return self.__height
-    @CaptureHeight.setter
-    def CaptureHeight(self, value):
-        self.__height = value
-
-    @property
-    def CaptureWidth(self):
-        return self.__width
-    @CaptureWidth.setter
-    def CaptureWidth(self, value):
-        self.__width = value
-
-    @property
-    def Fps(self):
-        return self.__fpslimit
-    @Fps.setter
-    def Fps(self, value):
-        self.__fpslimit = value
 
     def ToString(self):
         return self.__name
@@ -65,7 +44,7 @@ class Camera:
     def ImageCaptured(self):
         self.__imgLock.acquire()
         img = cv.QueryFrame(self.__cam)
-        self.__img = Image.fromstring("RGB", (self.__width, self.__height), img.tostring())
+        self.__img = Image.fromstring("RGB", (self.CaptureWidth, self.CaptureHeight), img.tostring())
         self.__imgLock.release()
 
     def GetCurrentImage(self):
@@ -97,30 +76,9 @@ class HSV:
         self.HSV_MAX_HUE = 360
         self.HSV_MAX_SAT = 255
         self.HSV_MAX_VAL = 255
-        self.__h = h
-        self.__s = s
-        self.__v = v
-
-    @property
-    def Hue(self):
-        return self.__h
-    @Hue.setter
-    def Hue(self, value):
-        self.__h = value
-
-    @property
-    def Sat(self):
-        return self.__s
-    @Sat.setter
-    def Sat(self, value):
-        self.__s = value
-
-    @property
-    def Val(self):
-        return self.__v
-    @Val.setter
-    def Val(self, value):
-        self.__v = value
+        self.Hue = h
+        self.Sat = s
+        self.Val = v
 
     @staticmethod
     def ConvertFromColor(c):
@@ -167,30 +125,9 @@ class RGB:
         self.HSV_MAX_RED = 255
         self.HSV_MAX_GRN = 255
         self.HSV_MAX_BLU = 255
-        self.__r = r
-        self.__g = g
-        self.__b = b
-
-    @property
-    def Red(self):
-        return self.__r
-    @Red.setter
-    def Red(self, value):
-        self.__r = value
-
-    @property
-    def Grn(self):
-        return self.__g
-    @Grn.setter
-    def Grn(self, value):
-        self.__g = value
-
-    @property
-    def Blu(self):
-        return self.__b
-    @Blu.setter
-    def Blu(self, value):
-        self.__b = value
+        self.Red = r
+        self.Grn = g
+        self.Blu = b
 
     @staticmethod
     def ConvertFromColor(c):
@@ -237,90 +174,36 @@ class MarkerScanCommand:
 #MarkerEventData类定义
 class MarkerEventData:
     def __init__(self):
-        self.__x = 0
-        self.__y = 0
-        self.__dx = 0
-        self.__dy = 0
-        self.__present = False
-        self.__area = 0
-        self.__bounds = None
-        self.__colorAvg = None
-        self.__timestamp = None
-        self.top = 0
+        self.X = 0
+        self.Y = 0
+        self.DX = 0
+        self.DY = 0
+        self.Present = False
+        self.Area = 0
+        self.Bounds = wx.Rect(0,0,0,0)
+        self.ColorAvg = None
+        self.Timestamp = time.time()
+        self.top = 480 
         self.bottom = 0
-        self.left = 0
+        self.left = 640
         self.right = 0
 
-    @property
-    def X(self):
-        return self.__x
-    @X.setter
-    def X(self, value):
-        self.__x = value
+#ColorKey类定义
+class ColorKey:
+    def __init__(self, h=HSV()):
+        self.hsv = h
+        self.key = (h.Hue+(h.Sat*h.HSV_MAX_HUE))+((h.Val*h.HSV_MAX_SAT)*h.HSV_MAX_HUE)
 
-    @property
-    def Y(self):
-        return self.__y
-    @Y.setter
-    def Y(self, value):
-        self.__v = value
+    def SetHsv(self, value):
+        self.hsv = value
+        self.key = (value.Hue+(value.Sat*value.HSV_MAX_HUE))+((value.Val*value.HSV_MAX_SAT)*value.HSV_MAX_HUE)
 
-    @property
-    def DX(self):
-        return self.__dx
-    @DX.setter
-    def DX(self, value):
-        self.__dx = value
-
-    @property
-    def DY(self):
-        return self.__dy
-    @DY.setter
-    def DY(self, value):
-        self.__dy = value
-
-    @property
-    def Present(self):
-        return self.__present
-    @Present.setter
-    def Present(self, value):
-        self.__present = value
-
-    @property
-    def ColorAvg(self):
-        return self.__colorAvg
-    @ColorAvg.setter
-    def ColorAvg(self, value):
-        self.__colorAvg = value
-
-    @property
-    def Area(self):
-        return self.__area
-    @Area.setter
-    def Area(self, value):
-        self.__area = value
-
-    @property
-    def Bounds(self):
-        return self.__bounds
-    @Bounds.setter
-    def Bounds(self, value):
-        self.__bounds = value
-
-    @property
-    def Timestamp(self):
-        return self.__timestamp
-    @Timestamp.setter
-    def Timestamp(self, value):
-        self.__timestamp = value
-
-    
 #Marker类定义
 class Marker:
     def __init__(self, name):
-        self.__name = name
-        self.__highlight = True
-        self.__smoothingEnabled = True
+        self.Name = name
+        self.Highlight = True
+        self.SmoothingEnabled = True
         self.smoothingFactor = 0.55
         self.searchMinX = MarkerScanCommand(self, True, 0)
         self.searchMaxX = MarkerScanCommand(self, False, 0)
@@ -329,75 +212,14 @@ class Marker:
         self.binsHue = 0
         self.binsSat = 0
         self.binsVal = 0
-        self.__currData = None
-        self.__frequencyThreshhold = 0
-        self.__lastGoodData = None
-        self.__prevData = None
-        self.__provideCalculatedProperties = False
-        self.__representativeColor = None
-
-    @property
-    def CurrentData(self):
-        return self.__currData
-    @CurrentData.setter
-    def CurrentData(self, value):
-        self.__currData = value
-
-    @property
-    def Highlight(self):
-        return self.__highlight
-    @Highlight.setter
-    def Highlight(self, value):
-        self.__highlight = value
-
-    @property
-    def LastGoodData(self):
-        return self.__lastGoodData
-    @LastGoodData.setter
-    def LastGoodData(self, value):
-        self.__lastGoodData = value
-
-    @property
-    def Name(self):
-        return self.__name
-    @Name.setter
-    def Name(self, value):
-        self.__name = value
-
-    @property
-    def PreviousData(self):
-        return self.__prevData
-    @PreviousData.setter
-    def PreviousData(self, value):
-        self.__prevData = value
-
-    @property
-    def ProvideCalculatedProperties(self):
-        return self.__provideCalculatedProperties
-    @ProvideCalculatedProperties.setter
-    def ProvideCalculatedProperties(self, value):
-        self.__provideCalculatedProperties = value
-
-    @property
-    def RepresentativeColor(self):
-        return self.__representativeColor
-    @RepresentativeColor.setter
-    def RepresentativeColor(self, value):
-        self.__representativeColor = value
-
-    @property
-    def SmoothingEnabled(self):
-        return self.__smoothingEnabled
-    @SmoothingEnabled.setter
-    def SmoothingEnabled(self, value):
-        self.__smoothingEnabled = value
-
-    @property
-    def Threshold(self):
-        return self.__frequencyThreshhold
-    @Threshold.setter
-    def Threshold(self, value):
-        self.__frequencyThreshhold = value
+        self.CurrData = MarkerEventData()
+        self.Threshold = 0
+        self.LastGoodData = None
+        self.PreviousData = MarkerEventData()
+        self.ProvideCalculatedProperties = False
+        self.RepresentativeColor = None
+        self.hsvFreq = {}
+        self.OnChange = None
 
     def ToString(self):
         return self.__name
@@ -407,7 +229,7 @@ class Marker:
         self.binsHue = (int)(shape[0])
         self.binsSat = (int)(shape[1])
         self.binsVal = (int)(shape[2])
-        self.__representativeColor = wx.Colour(0,0,0)
+        self.RepresentativeColor = wx.Colour(0,0,0)
         num = 0
         num2 = 0
         num3 = 0
@@ -417,17 +239,29 @@ class Marker:
             for j in range(self.binsSat):
                 for k in range(self.binsVal):
                     if rawHsvFreq[i,j,k] > 0:
+                        key = str.format("{0}", ColorKey(HSV(i,j,k)).key)
+                        self.hsvFreq[key] = rawHsvFreq[i,j,k]
                         num += rawHsvFreq[i,j,k]
                         num3 += rawHsvFreq[i,j,k] * i
                         num4 += rawHsvFreq[i,j,k] * j
                         num5 += rawHsvFreq[i,j,k] * k
                         num2 += 1
+        print self.hsvFreq
         if num2 == 0:
             return False
         self.Threshold = (int)((2 * num) / num2)
-        self.__representativeColor = HSV.ConvertToColor(HSV((int)(num3/num),(int)(num4/num),(int)(num5/num)))
+        num3 /= num2
+        num3 %= 360
+        num4 /= num2
+        num4 %= 255
+        num5 /= num2
+        num5 %= 255
+        self.RepresentativeColor = HSV.ConvertToColor(HSV(num3,num4,num5))
         return True
 
+    def FireMarkerEventData(self):
+        if not self.OnChange == None:
+            self.OnChange(self.CurrData)
 
 #TouchlessMgr类定义
 class TouchlessMgr:
@@ -440,18 +274,20 @@ class TouchlessMgr:
         self.__cameras = []
         self.__camHeight = 0
         self.__camWidth = 0
-        self.__currentCamera = None
+        self.CurrentCamera = None
+        self.lock = threading.RLock()
+
+    def MarkerScanCommandComparison(self, obj1, obj2):
+        if obj1.coordinate > obj2.coordinate:
+            return 1
+        elif obj1.coordinate == obj2.coordinate:
+            return 0
+        else:
+            return -1
 
     @property
     def Cameras(self):
         return self.__cameras
-
-    @property
-    def CurrentCamera(self):
-        return self.__currentCamera
-    @CurrentCamera.setter
-    def CurrentCamera(self, value):
-        self.__currentCamera = value
 
     @property
     def MarkersCount(self):
@@ -468,14 +304,19 @@ class TouchlessMgr:
         return item
 
     def CleanupCameras(self):
-        if not self.__currentCamera == None:
-            self.__currentCamera.Stop()
+        if not self.CurrentCamera == None:
+            self.CurrentCamera.Stop()
         self.__cameras = []
-        self.__currentCamera = None
+        self.CurrentCamera = None
 
     def __del__(self):
         self.CleanupCameras()
         self.__markers = []
+
+    def CaptureCallbackProc(self):
+        if not self.CurrentCamera == None:
+            self.CurrentCamera.ImageCaptured()
+            self.UpdateMarkers(self.CurrentCamera.GetCurrentImage())
 
     def GetMarkerAppearance(self, img, center, radius, binCounts=HSV(40,20,10)):
         height = img.size[1]
@@ -496,26 +337,81 @@ class TouchlessMgr:
         return numArray
 
     def postProcessMarker(self, marker):
-    #    marker.currData.Timestamp =
-        if marker.currData.Area > 0:
-            marker.currData.Present = True
-            #marker.currData.ColorAvg =
-            marker.currData.X /= marker.currData.Area
-            marker.currData.Y /= marker.currData.Area
-            marker.currData.Bounds = wx.Rect(marker.currData.left,marker.currData.top,marker.currData.right-marker.currData.left,marker.currData.bottom-marker.currData.top)
-            if marker.prevData.
-
+        marker.CurrData.Timestamp = time.time()
+        if marker.CurrData.Area > 0:
+            marker.CurrData.Present = True
+            marker.CurrData.ColorAvg = marker.RepresentativeColor
+            marker.CurrData.X /= marker.CurrData.Area
+            marker.CurrData.Y /= marker.CurrData.Area
+            marker.CurrData.Bounds = wx.Rect(marker.CurrData.left,marker.CurrData.top,marker.CurrData.right-marker.CurrData.left,marker.CurrData.bottom-marker.CurrData.top)
+            if marker.PreviousData.Present:
+                marker.CurrData.DX = marker.CurrData.X-marker.PreviousData.X
+                marker.CurrData.DY = marker.CurrData.Y-marker.PreviousData.Y
+            if marker.SmoothingEnabled:
+                marker.CurrData.X = (marker.CurrData.X+((marker.CurrData.Bounds.left+marker.CurrData.Bounds.right)/2))/2
+                marker.CurrData.Y = (marker.CurrData.Y+((marker.CurrData.Bounds.top+marker.CurrData.Bounds.bottom)/2))/2
+                if marker.PreviousData.Present:
+                    smoothingFactor = marker.smoothingFactor
+                    num2 = 1.00-smoothingFactor
+                    marker.CurrData.Area = (int)((smoothingFactor*marker.CurrData.Area)+(num2*marker.PreviousData.Area))
+                    marker.CurrData.X=(int)((smoothingFactor*marker.CurrData.X)+(num2*marker.PreviousData.X))
+                    marker.CurrData.Y=(int)((smoothingFactor*marker.CurrData.Y)+(num2*marker.PreviousData.Y))
+                    marker.CurrData.DX = marker.CurrData.X - marker.PreviousData.X
+                    marker.CurrData.DY = marker.CurrData.Y - marker.PreviousData.Y
+                    marker.CurrData.top = (int)((smoothingFactor*marker.CurrData.top)+(num2*marker.PreviousData.top))
+                    marker.CurrData.bottom = (int)((smoothingFactor*marker.CurrData.bottom)+(num2*marker.PreviousData.bottom))
+                    marker.CurrData.left = (int)((smoothingFactor*marker.CurrData.left)+(num2*marker.PreviousData.left))
+                    marker.CurrData.right = (int)((smoothingFactor*marker.CurrData.right)+(num2*marker.PreviousData.right))
+                    marker.CurrData.Bounds = wx.Rect(marker.CurrData.left,marker.CurrData.top,marker.CurrData.right-marker.CurrData.left,marker.CurrData.bottom-marker.CurrData.top)
+                marker.FireMarkerEventData()
+            else:
+                marker.CurrData.Present = False
+                            
     def preProcessMarker(self, marker, imgWidth, imgHeight):
-        pass
+        if marker.PreviousData.Present:
+            marker.lastGoodData = marker.PreviousData
+        if marker.CurrData.Present:
+            marker.lastGoodData = marker.CurrData
+        marker.PreviousData = marker.CurrData
+        marker.CurrData = MarkerEventData()
+        if marker.PreviousData.Present:
+            num = imgWidth / 20
+            num2 = imgHeight / 20
+            if marker.PreviousData.DX < 0:
+                num3 = 0.25
+            else:
+                num3 = 4.00
+            if marker.PreviousData.DY < 0:
+                num4 = 0.25
+            else:
+                num4 = 4.00
+            marker.searchMinX.coordinate = ((marker.PreviousData.left+((int)(((float)(marker.PreviousData.DX))/num3)))-(marker.PreviousData.Bounds.Width / 3)) - num
+            marker.searchMaxX.coordinate = ((marker.PreviousData.right+((int)(marker.PreviousData.DX*num3)))+(marker.PreviousData.Bounds.Width / 3)) + num
+            marker.searchMinY.coordinate = ((marker.PreviousData.top+((int)(((float)(marker.PreviousData.DY))/num4)))-(marker.PreviousData.Bounds.Height / 3)) - num2
+            marker.searchMaxY.coordinate = ((marker.PreviousData.bottom+((int)(marker.PreviousData.DY*num4)))+(marker.PreviousData.Bounds.Height / 3)) + num2
+            marker.searchMinX.coordinate = max(marker.searchMinX.coordinate,0)
+            marker.searchMaxX.coordinate = min(marker.searchMaxX.coordinate,imgWidth-1)
+            marker.searchMinY.coordinate = max(marker.searchMinY.coordinate,0)
+            marker.searchMaxY.coordinate = min(marker.searchMaxY.coordinate,imgHeight-1)
+            data = marker.PreviousData
+        else:
+            marker.searchMinX.coordinate = 0
+            marker.searchMinY.coordinate = 0
+            marker.searchMaxX.coordinate = imgWidth-1
+            marker.searchMaxY.coordinate = imgHeight -1
+        marker.CurrData.top = imgHeight
+        marker.CurrData.bottom = 0
+        marker.CurrData.left = imgWidth
+        marker.CurrData.right = 0
 
     def RefreshCameraList(self):
         self.CleanupCameras()
         self.__cameras = []
-        self.__currentCamera = Camera()
-        self.__camHeight = self.__currentCamera.CaptureHeight
-        self.__camWidth = self.__currentCamera.CaptureWidth
-        self.__cameras.append(self.__currentCamera)
-        self.__currentCamera.Start()
+        self.CurrentCamera = Camera()
+        self.__camHeight = self.CurrentCamera.CaptureHeight
+        self.__camWidth = self.CurrentCamera.CaptureWidth
+        self.__cameras.append(self.CurrentCamera)
+        self.CurrentCamera.Start()
 
     def RemoveMarker(self, index):
         count = len(self.__markers)
@@ -524,4 +420,75 @@ class TouchlessMgr:
         self.__markers.pop(index)
 
     def UpdateMarkers(self, img):
-        pass
+        if self.MarkersCount == 4:
+            self.lock.acquire()
+            t1 = time.time()
+            hsv = HSV()
+            flag = True
+            key = ColorKey()
+            array = self.__markers[:]
+            self.__markerScanCommandsY = []
+            for marker in self.__markers:
+                self.preProcessMarker(marker,img.size[0],img.size[1])
+                self.__markerScanCommandsY.append(marker.searchMinY)
+                self.__markerScanCommandsY.append(marker.searchMaxY)
+            self.__markerScanCommandsY.sort(cmp=self.MarkerScanCommandComparison)
+            counts = len(self.__markerScanCommandsY)
+            for i in range(counts):
+                if self.__markerScanCommandsY[i].command:
+                    self.__scanMarkersY.append(self.__markerScanCommandsY[i].marker)
+                else:
+                    self.__scanMarkersY.remove(self.__markerScanCommandsY[i].marker)
+                if not len(self.__scanMarkersY) == 0:
+                    self.__markerScanCommandsX = []
+                    for marker in self.__scanMarkersY:
+                        self.__markerScanCommandsX.append(marker.searchMinX)
+                        self.__markerScanCommandsX.append(marker.searchMaxX)
+                    self.__markerScanCommandsX.sort(cmp = self.MarkerScanCommandComparison)
+                    count = len(self.__markerScanCommandsX)
+                    for j in range(count):
+                        if self.__markerScanCommandsX[j].command:
+                            self.__scanMarkersX.append(self.__markerScanCommandsX[j].marker)
+                        else:
+                            self.__scanMarkersX.remove(self.__markerScanCommandsX[j].marker)
+                        if not len(self.__scanMarkersX) == 0:
+                            if (counts < (i+1)) or (count <(j+1)):
+                                raise AssertionError("This state should never be reached, this means that we are processing in an area after an add command, but not before a remove command, check search bounds for inversion")
+                            for k in range(self.__markerScanCommandsY[i].coordinate,self.__markerScanCommandsY[i+1].coordinate+1):
+                                xy = (self.__markerScanCommandsX[j].coordinate,k)
+                                coordinate = self.__markerScanCommandsX[j].coordinate
+                                while coordinate <= self.__markerScanCommandsX[j+1].coordinate:
+                                    flag = True
+                                    for marker in self.__scanMarkersX:
+                                        if flag:
+                                            rgb = img.getpixel(xy)
+                                            hsv = RGB.ConvertToHSV(RGB(rgb[0],rgb[1],rgb[2]))
+                                            flag = False
+                                        if (marker.Highlight and marker.PreviousData.Present) and (((coordinate == marker.searchMinX.coordinate)or(coordinate == marker.searchMaxX.coordinate))or((k == marker.searchMinY.coordinate)or(k == marker.searchMaxY.coordinate))):
+                                            color = marker.RepresentativeColor
+                                            img.putpixel(xy,(color.red,color.green,color.blue))
+                                        key.SetHsv(HSV.GetBinnedHSV(hsv,HSV(marker.binsHue,marker.binsSat,marker.binsVal)))
+                                        key_ = str.format("{0}", key.key)
+                                        if marker.hsvFreq.has_key(key_) and ((int)(marker.hsvFreq[key_]) > marker.Threshold):
+                                            marker.CurrData.Area += 1
+                                            marker.CurrData.X += coordinate
+                                            marker.CurrData.Y += k
+                                            if k < marker.CurrData.top:
+                                                marker.CurrData.top = k
+                                            if k > marker.CurrData.bottom:
+                                                marker.CurrData.bottom = k
+                                            if coordinate < marker.CurrData.left:
+                                                marker.CurrData.left = coordinate
+                                            if coordinate > marker.CurrData.right:
+                                                marker.CurrData.right = coordinate
+                                            if marker.Highlight:
+                                                color = marker.RepresentativeColor
+                                                img.putpixel(xy,(color.red,color.green,color.blue))
+                                    coordinate += 1
+                                    xy = (coordinate, k)
+            for marker in array:
+                self.postProcessMarker(marker)
+            print time.time() - t1
+            self.lock.release()
+
+            

@@ -1,24 +1,10 @@
 class SizeR:
-    def __init__(self, cx = 0, cy = 0):
-        self.__cx = cx
-        self.__cy = cy
+    def __init__(self, width = 0, height = 0):
+        self.Width = width
+        self.Height = height
 
     def __getitem__(self, range):
-        return SizeR(self.__cx, self.__cy)
-
-    @property
-    def Width(self):
-        return self.__cx
-    @Width.setter
-    def Width(self, value):
-        self.__cx = value
-
-    @property
-    def Height(self):
-        return self.__cy
-    @Height.setter
-    def Height(self, value):
-        self.__cy = value
+        return SizeR(self.Width, self.Height)
 
     def __eq__(self, other):
         return (self.Width == other.Width and self.Height == other.Height)
