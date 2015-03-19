@@ -122,7 +122,13 @@ class WuwPanel(wx.Panel):
         self.labelDemoInstructions=wx.TextCtrl(self.tabPageApps,pos=(44*self.Grid,0),
                                              size=(16*self.Grid,16*self.Grid))
         self.labelDemoInstructions.SetEditable(False)
-
+        self.buttonClockDemo=wx.Button(self.tabPageApps,label="Clock",pos=(1*self.Grid,1*self.Grid),
+                                       size=(8*self.Grid,2*self.Grid))
+        self.buttonPhotoDemo=wx.Button(self.tabPageApps,label="Photo",pos=(1*self.Grid,4*self.Grid),
+                                       size=(8*self.Grid,2*self.Grid))
+        self.buttonWeatherDemo=wx.Button(self.tabPageApps,label="Weather",pos=(1*self.Grid,7*self.Grid),
+                                         size=(8*self.Grid,2*self.Grid))
+        
         #构建Label组
         self.labelM=wx.StaticText(self, label=" M", pos=(4*self.Grid,self.Grid),
                                 size=(2*self.Grid,2*self.Grid))
@@ -140,10 +146,20 @@ class WuwPanel(wx.Panel):
                                        size=(4*self.Grid,2*self.Grid))
         self.lblResult=wx.StaticText(self, label="Test", pos=(12*self.Grid,self.Grid),
                                    size=(12*self.Grid,2*self.Grid))
+        
+        #构建DemoBox
+        self.BoxClock=wx.StaticBox(self,pos=(40*self.Grid,30*self.Grid),
+                                   size=(20*self.Grid,20*self.Grid))
+        self.BoxClock.threadTime=None
+        self.BoxWeather=wx.StaticBox(self,pos=(40*self.Grid,20*self.Grid),
+                                     size=(20*self.Grid,40*self.Grid))
+        self.BoxPhoto=wx.StaticBox(self,pos=(18*self.Grid,16*self.Grid),
+                                   size=(64*self.Grid,48*self.Grid))
 
         ###Global Variables
         self.__touchlessMgr = None
         self.__fAddingMarker = False
+        self.__inBoxArea = False
         self.m = None
         self.n = None
         self.o = None
@@ -158,20 +174,28 @@ class WuwPanel(wx.Panel):
         self.__drawSelectionAdornment = False
         self.__addedMarkerCount = 0
         self.__latestFrame = None
+        self.__latestFrameTime = time.time()
+        self.__latestFrameTimeSegment = False
         self.__ratioScreenCameraHeight = 0
         self.__ratioScreenCameraWidth = 0
+        self.clockDemo = False
+        self.photoDemo = False
+        self.weatherDemo = False
         
     	###Load
         self.__touchlessMgr = TouchlessLib.TouchlessMgr()
         self.__touchlessMgr.RefreshCameraList()
-        self.threadCapture = self.ThreadCapture("Capture", 0.03, self.pictureBoxDisplay, self.__touchlessMgr.CurrentCamera)
+        self.threadCapture = self.ThreadCapture("Capture", 0.03, self.pictureBoxDisplay, self.__touchlessMgr.CurrentCamera, self)
         self.threadCapture.setDaemon(True)
         self.threadCapture.start()
-        self.threadMarker = self.ThreadMarker("Marker", 1, self.__touchlessMgr)
+        self.threadMarker = self.ThreadMarker("Marker", 5, self.__touchlessMgr)
         self.threadMarker.setDaemon(True)
         self.threadMarker.start()
         self.gestureLoad()
         time.clock()
+        self.BoxClock.Hide()
+        self.BoxWeather.Hide()
+        self.BoxPhoto.Hide()
         self.ResetEnvironment()
 
         ###事件响应
@@ -192,22 +216,43 @@ class WuwPanel(wx.Panel):
         self.Bind(wx.EVT_LEFT_UP, self.WUW_MouseUp)
         self.btnExit.Bind(wx.EVT_BUTTON, self.btnExit_Click)
         self.btnShowHide.Bind(wx.EVT_BUTTON, self.btnShowHide_Click)
+        self.buttonClockDemo.Bind(wx.EVT_BUTTON, self.buttonClockDemo_Click)
+        self.buttonPhotoDemo.Bind(wx.EVT_BUTTON, self.buttonPhotoDemo_Click)
+        self.buttonWeatherDemo.Bind(wx.EVT_BUTTON, self.buttonWeatherDemo_Click)
+        self.BoxClock.Bind(wx.EVT_PAINT, self.ShowTime)
+        self.BoxPhoto.Bind(wx.EVT_PAINT, self.drawPhoto)
 
     #线程——捕获某帧图像 
     class ThreadCapture(threading.Thread):
-        def __init__(self, threadname, times, box, cam):
+        def __init__(self, threadname, times, box, cam, panel):
             threading.Thread.__init__(self, name=threadname)
             self.__times = times
             self.__stop = False
             self.__box = box
             self.__cam = cam
+            self.__panel = panel
         def run(self):
             while not self.__stop:
                 self.__cam.ImageCaptured()
-                self.__box.Refresh()
+                self.__panel.UpdateLatestFrame()
+                if self.__box.Shown:
+                    self.__box.Refresh()
                 time.sleep(self.__times)
         def stop(self):
             self.__stop = True
+
+    def UpdateLatestFrame(self):
+        if not self.__fAddingMarker:
+            self.__latestFrame = self.__touchlessMgr.CurrentCamera.GetCurrentImage()
+            self.__latestFrameTime = time.time()
+        else:
+            markerWait = time.time()-self.__latestFrameTime
+            if markerWait <= 5:
+                self.__latestFrame = self.__touchlessMgr.CurrentCamera.GetCurrentImage()
+                if markerWait * 1000 % 1000 < 100:
+                    self.__latestFrameTimeSegment = True
+                else:
+                    self.__latestFrameTimeSegment = False
 
     #线程——追踪标记物
     class ThreadMarker(threading.Thread):
@@ -218,10 +263,26 @@ class WuwPanel(wx.Panel):
             self.__stop = False
         def run(self):
             while not self.__stop:
-                self.__mgr.UpdateMarkers(self.__mgr.CurrentCamera.GetCurrentImage())
+                if self.__mgr.MarkersCount == 4:
+                    self.__mgr.UpdateMarkers(self.__mgr.CurrentCamera.GetCurrentImage())
                 time.sleep(self.__times)
         def stop(self):
             self.__stop = True
+
+    #线程——时间显示
+    class ThreadTime(threading.Thread):
+        def __init__(self, threadname, times, box):
+            threading.Thread.__init__(self, name=threadname)
+            self.__times = times
+            self.__box = box
+            self.__stop = False
+        def run(self):
+            while not self.__stop:
+                self.__box.Refresh(True)
+                time.sleep(self.__times)
+        def stop(self):
+            self.__stop = True
+        
             
     ###Environmenmt
     def btnExit_Click(self, event):
@@ -258,6 +319,9 @@ class WuwPanel(wx.Panel):
     def WUW_Destroy(self, event):
         self.threadCapture.stop()
         self.threadMarker.stop()
+        self.__touchlessMgr.CleanupCameras()
+        if not self.BoxClock.threadTime == None:
+            self.BoxClock.threadTime.stop()
 
     def WUW_Paint(self, event):
         if len(self.__points) > 0:
@@ -275,8 +339,9 @@ class WuwPanel(wx.Panel):
 
     ###Touchless Event Handling
     def drawLatestImage(self, event):
-        if self.__touchlessMgr.CurrentCamera.isOn():
-            self.__latestFrame = self.__touchlessMgr.CurrentCamera.GetCurrentImage()
+        if self.__touchlessMgr.CurrentCamera == None:
+            return
+        if not self.__latestFrame == None:
             bmp = TouchlessLib.ImageToBitmap(self.__latestFrame)
             dc = wx.PaintDC(self.pictureBoxDisplay)
             dc.DrawBitmap(bmp,0,0)
@@ -285,6 +350,13 @@ class WuwPanel(wx.Panel):
                 dc.SetPen(wx.Pen("red", 1))
                 dc.SetBrush(wx.Brush("",wx.TRANSPARENT))
                 dc.DrawEllipse(self.__markerCenter.x-self.__markerRadius,self.__markerCenter.y-self.__markerRadius,2*self.__markerRadius,2*self.__markerRadius)
+
+            if self.__latestFrameTimeSegment:
+                markerWait = 5-(int)(round(time.time()-self.__latestFrameTime))
+                text = str.format("{0}", markerWait)
+                dc.SetFont(wx.Font(5*self.Grid,wx.FONTFAMILY_DEFAULT,wx.FONTSTYLE_NORMAL,wx.FONTWEIGHT_BOLD))
+                dc.SetTextForeground("red")
+                dc.DrawText(text,5*self.Grid,5*self.Grid)
 
     ###Marker Mode
 
@@ -323,6 +395,8 @@ class WuwPanel(wx.Panel):
 
     ##Display Interaction
     def pictureBoxDisplay_MouseDown(self, event):
+        if not self.__fAddingMarker:
+            return
         if not self.__touchlessMgr.CurrentCamera.isOn():
             return
         self.__markerCenter = event.GetPosition() - self.pictureBoxDisplay.GetPosition()
@@ -330,6 +404,8 @@ class WuwPanel(wx.Panel):
         self.__drawSelectionAdornment = True
 
     def pictureBoxDisplay_MouseMove(self, event):
+        if not self.__fAddingMarker:
+            return
         if not self.__markerCenter == None:
             dx = event.GetX() - self.pictureBoxDisplay.GetPosition().x - self.__markerCenter.x
             dy = event.GetY() - self.pictureBoxDisplay.GetPosition().y - self.__markerCenter.y
@@ -338,6 +414,9 @@ class WuwPanel(wx.Panel):
             self.pictureBoxDisplay.Refresh()
 
     def pictureBoxDisplay_MouseUp(self, event):
+        if not self.__fAddingMarker:
+            self.__inBoxArea = False
+            return
         if not self.__markerCenter == None:
             dx = event.GetX() - self.pictureBoxDisplay.GetPosition().x - self.__markerCenter.x
             dy = event.GetY() - self.pictureBoxDisplay.GetPosition().y - self.__markerCenter.y
@@ -355,9 +434,11 @@ class WuwPanel(wx.Panel):
         self.__markerRadius = 0
         self.__drawSelectionAdornment = False
         self.pictureBoxDisplay.Refresh()
+        self.__inBoxArea = False
 
         if self.__touchlessMgr.MarkersCount == 4:
             self.__fAddingMarker = False
+            self.buttonMarkerAdd.Label = "Add A New Marker"
         self.nameMarkers()
     
     
@@ -420,8 +501,8 @@ class WuwPanel(wx.Panel):
             point = event.GetPosition()
             rect = self.pictureBoxDisplay.GetRect()
             if point.x >= rect.x and point.x <= rect.x + rect.width and point.y >= rect.y and point.y <= rect.y + rect.height:
-                self.__fAddingMarker = True
-        if self.__fAddingMarker:
+                self.__inBoxArea = True
+        if self.__inBoxArea:
             self.pictureBoxDisplay_MouseDown(event)
             return
         self.__isDown = True
@@ -430,7 +511,7 @@ class WuwPanel(wx.Panel):
         self.Refresh()
 
     def WUW_MouseMove(self, event):
-        if self.__fAddingMarker:
+        if self.__inBoxArea:
             self.pictureBoxDisplay_MouseMove(event)
             return
         if self.__isDown:
@@ -438,7 +519,7 @@ class WuwPanel(wx.Panel):
             self.Refresh(True, wx.Rect(event.GetX()-2,event.GetY()-2,4,4))
 
     def WUW_MouseUp(self, event):
-        if self.__fAddingMarker:
+        if self.__inBoxArea:
             self.pictureBoxDisplay_MouseUp(event)
             return
         if self.__isDown:
@@ -448,10 +529,88 @@ class WuwPanel(wx.Panel):
                     pass
                 elif self.__rec.NumGestures > 0:
                     result = self.__rec.Recognize(self.__points)
-                    print result.Name
+                    self.lblResult.Label = str.format("{0}: {1} ({2}px, {3}",
+                                                 result.Name,
+                                                 round(result.Score,2),
+                                                 round(result.Distance,2),
+                                                 round(result.Angle,2))
+
+                    dic={
+                        "clock1":self.buttonClockDemo_Click,
+                        "clock2":self.buttonClockDemo_Click,
+                        "photo1":self.buttonPhotoDemo_Click,
+                        "photo2":self.buttonPhotoDemo_Click,
+                        "photo3":self.buttonPhotoDemo_Click,
+                        "photo4":self.buttonPhotoDemo_Click,
+                        "photo5":self.buttonPhotoDemo_Click,
+                        "photo6":self.buttonPhotoDemo_Click,
+                        "weather1":self.buttonWeatherDemo_Click,
+                        "weather2":self.buttonWeatherDemo_Click
+                        }
+                    dic[result.Name](event)
                 
 
     ###Demo Mode
+    ##Clock Demo
+    def buttonClockDemo_Click(self, event):
+        if self.clockDemo:
+            self.clockDemo = False
+            self.labelDemoName.Label = "WUW"
+            self.buttonClockDemo.Label = "Clock"
+            self.BoxClock.threadTime.stop()
+            self.BoxClock.threadTime=None
+            self.BoxClock.Hide()
+            self.ResetEnvironment()
+        else:
+            self.StopOtherApps(event)
+            self.clockDemo = True
+            self.labelDemoName.Label = "Clock"
+            self.buttonClockDemo.Label = "Stop Clock"
+            self.BoxClock.threadTime = self.ThreadTime("time", 1, self.BoxClock)
+            self.BoxClock.threadTime.start()
+            self.BoxClock.Show()
+
+    def ShowTime(self, event):
+        dc = wx.PaintDC(self.BoxClock)
+        dc.Clear()
+        dc.DrawText(time.strftime("%H:%M:%S", time.localtime(time.time())),
+                    8*self.Grid,8*self.Grid)
+
+    ##Photo Demo
+    def buttonPhotoDemo_Click(self, event):       
+        if self.photoDemo:
+            self.photoDemo = False
+            self.labelDemoName.Label = "WUW"
+            self.buttonPhotoDemo.Label = "Photo"
+            self.BoxPhoto.Hide()
+            self.ResetEnvironment()
+        else:
+            self.StopOtherApps(event)
+            self.photoDemo = True
+            self.labelDemoName.Label = "Photo"
+            self.buttonPhotoDemo.Label = "Stop Photo"
+            self.BoxPhoto.Show()
+         #   self.BoxPhoto.Refresh()
+        """
+        self.BoxPhoto.Show()
+        img = self.__touchlessMgr.CurrentCamera.GetCurrentImage()
+        bmp = TouchlessLib.ImageToBitmap(img)
+        dc = wx.ClientDC(self.BoxPhoto)
+        dc.DrawBitmap(bmp,0,0)
+        """
+
+    def drawPhoto(self, event):
+        if self.__latestFrame == None:
+            return
+        if self.__isDown:
+            return
+        bmp = TouchlessLib.ImageToBitmap(self.__latestFrame)
+        dc = wx.PaintDC(self.BoxPhoto)
+        dc.DrawBitmap(bmp,0,0)        
+    
+    ##Weather Demo
+    def buttonWeatherDemo_Click(self, event):
+        pass
 
 def main():
     app = wx.App(False)
